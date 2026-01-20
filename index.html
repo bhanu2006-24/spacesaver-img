@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpaceSaver Pro - Advanced Image Optimizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- JSZip for Zip downloads -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .drag-active {
+            border-color: #6366f1 !important;
+            background-color: rgba(99, 102, 241, 0.1) !important;
+            transform: scale(1.01);
+        }
+
+        /* Comparison Slider Styles */
+        .comparison-container {
+            position: relative;
+            overflow: hidden;
+            user-select: none;
+        }
+        .comparison-slider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: white;
+            z-index: 10;
+            cursor: ew-resize;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        .comparison-handle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            color: #4f46e5;
+            transition: transform 0.1s;
+        }
+        .comparison-handle:active { transform: translate(-50%, -50%) scale(1.1); }
+        
+        .loader {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 3px solid #4f46e5;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Toast Animation */
+        .toast {
+            animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes slideIn {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300 pb-20">
+
+    <!-- Global Progress Bar -->
+    <div id="global-progress" class="fixed top-0 left-0 h-1 bg-indigo-600 z-[60] transition-all duration-300" style="width: 0%"></div>
+
+    <!-- Navbar -->
+    <nav class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 shadow-sm transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-3">
+                    <div class="bg-gradient-to-br from-indigo-500 to-purple-600 p-2.5 rounded-xl text-white shadow-lg shadow-indigo-200 dark:shadow-none">
+                        <i data-lucide="zap" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 leading-none">SpaceSaver Pro</h1>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">Bulk Image Optimizer</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <button id="theme-toggle" class="p-2 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                        <i data-lucide="moon" class="w-5 h-5 hidden dark:block"></i>
+                        <i data-lucide="sun" class="w-5 h-5 block dark:hidden"></i>
+                    </button>
+                    <div class="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
+                    <button onclick="window.location.reload()" class="text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors text-sm font-medium">Reset</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Stats Dashboard -->
+    <div class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+                <!-- Stat Cards -->
+                <div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 transition-colors">
+                    <p class="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">Total Files</p>
+                    <div class="flex items-baseline gap-2">
+                        <span id="stat-count" class="text-2xl font-bold text-slate-900 dark:text-white">0</span>
+                        <span class="text-xs text-slate-400 font-medium">images</span>
+                    </div>
+                </div>
+                <div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 transition-colors">
+                    <p class="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">Original Size</p>
+                    <div class="flex items-baseline gap-2">
+                        <span id="stat-orig" class="text-2xl font-bold text-slate-900 dark:text-white">0</span>
+                        <span class="text-xs text-slate-400 font-medium">MB</span>
+                    </div>
+                </div>
+                <div class="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-800 transition-colors">
+                    <p class="text-indigo-600 dark:text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-1">Space Saved</p>
+                    <div class="flex items-baseline gap-2">
+                        <span id="stat-saved" class="text-2xl font-bold text-indigo-700 dark:text-indigo-300">0</span>
+                        <span class="text-xs text-indigo-500 dark:text-indigo-400 font-medium">MB</span>
+                    </div>
+                </div>
+                <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-2xl border border-green-100 dark:border-green-800 transition-colors">
+                    <p class="text-green-600 dark:text-green-400 text-xs font-semibold uppercase tracking-wider mb-1">Efficiency</p>
+                    <div class="flex items-baseline gap-2">
+                        <span id="stat-percent" class="text-2xl font-bold text-green-700 dark:text-green-300">0%</span>
+                        <span class="text-xs text-green-600 dark:text-green-400 font-medium">reduction</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Sidebar / Settings -->
+            <div class="lg:col-span-4 space-y-6">
+                
+                <!-- Upload Box -->
+                <div 
+                    id="drop-zone"
+                    class="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl bg-white dark:bg-slate-800 p-8 text-center transition-all cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-500 hover:shadow-xl hover:shadow-indigo-50 dark:hover:shadow-none group relative overflow-hidden"
+                    onclick="document.getElementById('file-input').click()"
+                    ondragover="handleDragOver(event)"
+                    ondragleave="handleDragLeave(event)"
+                    ondrop="handleDrop(event)"
+                >
+                    <div class="absolute inset-0 bg-indigo-50/50 dark:bg-indigo-900/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="relative z-10">
+                        <input type="file" id="file-input" class="hidden" multiple accept="image/*" onchange="handleFileSelect(event)">
+                        
+                        <div class="w-16 h-16 bg-white dark:bg-slate-700 shadow-sm border border-slate-100 dark:border-slate-600 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
+                            <i data-lucide="upload-cloud" class="w-8 h-8"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white">Add Images</h3>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-2 px-4">Drag & drop or click to browse. <br/> Supports JPG, PNG, WebP.</p>
+                    </div>
+                </div>
+
+                <!-- Settings Card -->
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
+                    <div class="flex items-center gap-2 mb-6">
+                        <div class="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                            <i data-lucide="sliders" class="w-4 h-4 text-slate-600 dark:text-slate-300"></i>
+                        </div>
+                        <h2 class="font-bold text-slate-800 dark:text-white">Configuration</h2>
+                    </div>
+
+                    <div class="space-y-6">
+                        <!-- Auto Start Toggle -->
+                        <div class="flex items-center justify-between">
+                            <label class="text-sm font-medium text-slate-700 dark:text-slate-300">Auto-start on upload</label>
+                            <button id="auto-start-toggle" onclick="toggleAutoStart()" class="w-11 h-6 bg-slate-200 dark:bg-slate-600 rounded-full relative transition-colors focus:outline-none">
+                                <span class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform transform translate-x-0"></span>
+                            </button>
+                        </div>
+
+                        <!-- Format -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Target Format</label>
+                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                <button onclick="updateSetting('format', 'image/avif')" class="format-btn bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition-all" data-value="image/avif">
+                                    AVIF (Best)
+                                </button>
+                                <button onclick="updateSetting('format', 'image/webp')" class="format-btn active bg-indigo-600 text-white px-3 py-2.5 rounded-xl text-sm font-medium transition-all shadow-md shadow-indigo-200 dark:shadow-none" data-value="image/webp">
+                                    WebP (Good)
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="updateSetting('format', 'image/jpeg')" class="format-btn bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition-all" data-value="image/jpeg">
+                                    JPEG
+                                </button>
+                                <button onclick="updateSetting('format', 'image/png')" class="format-btn bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition-all" data-value="image/png">
+                                    PNG
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Quality -->
+                        <div>
+                            <div class="flex justify-between mb-3">
+                                <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Quality Level</label>
+                                <span id="quality-display" class="text-xs font-bold bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded">80%</span>
+                            </div>
+                            <input 
+                                type="range" 
+                                min="10" 
+                                max="100" 
+                                value="80" 
+                                class="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                oninput="updateSetting('quality', this.value / 100)"
+                            >
+                        </div>
+
+                        <!-- Resize -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Max Width</label>
+                            <div class="relative">
+                                <select onchange="updateSetting('maxWidth', parseInt(this.value))" class="w-full p-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none appearance-none transition-colors">
+                                    <option value="3840">Original / 4K (3840px)</option>
+                                    <option value="1920" selected>Full HD (1920px)</option>
+                                    <option value="1280">HD (1280px)</option>
+                                    <option value="800">Web Friendly (800px)</option>
+                                </select>
+                                <i data-lucide="chevron-down" class="absolute right-3 top-3.5 w-4 h-4 text-slate-400 pointer-events-none"></i>
+                            </div>
+                        </div>
+
+                        <!-- Filename Options -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Filename Suffix</label>
+                            <input type="text" id="suffix-input" value="_optimized" onchange="updateSetting('suffix', this.value)" class="w-full p-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition-colors" placeholder="_optimized">
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-100 dark:border-slate-700">
+                            <button onclick="runOptimizer()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-200 dark:shadow-none hover:shadow-indigo-300 active:scale-[0.98]">
+                                <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+                                Start Optimization
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content / Results -->
+            <div class="lg:col-span-8">
+                
+                <!-- Action Bar -->
+                <div id="action-bar" class="hidden mb-6 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex-col sm:flex-row justify-between items-center gap-4 transition-colors">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Ready to download</span>
+                    </div>
+                    <div class="flex gap-2 w-full sm:w-auto">
+                        <button onclick="clearAll()" class="flex-1 sm:flex-none justify-center text-slate-500 dark:text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            Clear
+                        </button>
+                        <button onclick="downloadZip()" class="flex-1 sm:flex-none justify-center bg-slate-900 dark:bg-slate-700 text-white hover:bg-slate-800 dark:hover:bg-slate-600 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-slate-200 dark:shadow-none">
+                            <i data-lucide="archive" class="w-4 h-4"></i>
+                            Download ZIP
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div id="empty-state" class="flex flex-col items-center justify-center py-20 text-slate-400 dark:text-slate-500">
+                    <div class="bg-slate-100 dark:bg-slate-800 p-6 rounded-full mb-4 transition-colors">
+                        <i data-lucide="image" class="w-10 h-10 opacity-50"></i>
+                    </div>
+                    <p class="text-lg font-medium text-slate-600 dark:text-slate-300">No images loaded yet</p>
+                    <p class="text-sm">Upload images to start saving space</p>
+                </div>
+
+                <!-- File List -->
+                <div id="file-list" class="space-y-3">
+                    <!-- Dynamic Content -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Comparison Modal -->
+    <div id="compare-modal" class="fixed inset-0 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="absolute inset-0 bg-slate-900/90 backdrop-blur-sm" onclick="closeComparison()"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden transform scale-95 transition-all duration-300" id="compare-content">
+                
+                <!-- Modal Header -->
+                <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 z-20 transition-colors">
+                    <div>
+                        <h3 class="font-bold text-slate-800 dark:text-white">Visual Comparison</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Drag slider to compare Original vs Optimized</p>
+                    </div>
+                    <button onclick="closeComparison()" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-500 transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Canvas Area -->
+                <div class="flex-1 relative bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwgAADsIBFShKgAAAABh0RVh0U29mdHdhcmUAcGFpbnQubmV0IDQuMC440b43JAAAABxJREFUOE9jTK2895+BgYEh9fJ7MAYGBgYGBgYAkC4P0d7lQ84AAAAASUVORK5CYII=')] bg-repeat overflow-hidden flex items-center justify-center p-4" id="comparison-wrapper">
+                    <div class="relative max-w-full max-h-full shadow-2xl" id="comp-img-container">
+                        <!-- Images injected here -->
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center transition-colors">
+                    <div class="flex gap-8">
+                        <div>
+                            <p class="text-xs font-bold text-slate-400 uppercase">Original</p>
+                            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200" id="comp-orig-size">-</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-indigo-400 uppercase">Optimized</p>
+                            <p class="text-sm font-semibold text-indigo-700 dark:text-indigo-300" id="comp-opt-size">-</p>
+                        </div>
+                    </div>
+                    <button id="comp-download-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none">
+                        Download This Image
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"></div>
+
+    <script>
+        // --- State ---
+        let files = [];
+        let settings = {
+            format: 'image/webp',
+            quality: 0.8,
+            maxWidth: 1920,
+            suffix: '_optimized',
+            autoStart: false
+        };
+        let darkMode = localStorage.getItem('theme') === 'dark';
+
+        // --- Init ---
+        lucide.createIcons();
+        applyTheme();
+
+        // --- DOM Elements ---
+        const dropZone = document.getElementById('drop-zone');
+        const fileList = document.getElementById('file-list');
+        const actionBar = document.getElementById('action-bar');
+        const emptyState = document.getElementById('empty-state');
+        const globalProgress = document.getElementById('global-progress');
+        
+        // Stats
+        const statCount = document.getElementById('stat-count');
+        const statOrig = document.getElementById('stat-orig');
+        const statSaved = document.getElementById('stat-saved');
+        const statPercent = document.getElementById('stat-percent');
+        const qualityDisplay = document.getElementById('quality-display');
+
+        // Modal
+        const compareModal = document.getElementById('compare-modal');
+        const compareContent = document.getElementById('compare-content');
+        const compImgContainer = document.getElementById('comp-img-container');
+        const compOrigSize = document.getElementById('comp-orig-size');
+        const compOptSize = document.getElementById('comp-opt-size');
+        const compDownloadBtn = document.getElementById('comp-download-btn');
+
+        // --- Theme Logic ---
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            darkMode = !darkMode;
+            localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+            applyTheme();
+        });
+
+        function applyTheme() {
+            if (darkMode) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+
+        // --- Toast Logic ---
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colors = type === 'error' 
+                ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/50 dark:text-red-200 dark:border-red-800'
+                : 'bg-white text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700';
+
+            toast.className = `toast pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg ${colors} min-w-[200px]`;
+            toast.innerHTML = `
+                <i data-lucide="${type === 'error' ? 'alert-circle' : 'check-circle-2'}" class="w-5 h-5 ${type === 'error' ? 'text-red-500' : 'text-green-500'}"></i>
+                <span class="text-sm font-medium">${message}</span>
+            `;
+            
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // --- Drag & Drop ---
+        function handleDragOver(e) { e.preventDefault(); dropZone.classList.add('drag-active'); }
+        function handleDragLeave(e) { e.preventDefault(); dropZone.classList.remove('drag-active'); }
+        function handleDrop(e) {
+            e.preventDefault();
+            dropZone.classList.remove('drag-active');
+            const droppedFiles = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+            if(droppedFiles.length > 0) addFiles(droppedFiles);
+        }
+        function handleFileSelect(e) {
+            const selectedFiles = Array.from(e.target.files);
+            if(selectedFiles.length > 0) addFiles(selectedFiles);
+            e.target.value = '';
+        }
+
+        // --- Auto Start ---
+        function toggleAutoStart() {
+            settings.autoStart = !settings.autoStart;
+            const btn = document.getElementById('auto-start-toggle');
+            const dot = btn.querySelector('span');
+            
+            if (settings.autoStart) {
+                btn.classList.replace('bg-slate-200', 'bg-indigo-600');
+                btn.classList.replace('dark:bg-slate-600', 'dark:bg-indigo-500');
+                dot.classList.replace('translate-x-0', 'translate-x-5');
+                showToast('Auto-start enabled');
+            } else {
+                btn.classList.replace('bg-indigo-600', 'bg-slate-200');
+                btn.classList.replace('dark:bg-indigo-500', 'dark:bg-slate-600');
+                dot.classList.replace('translate-x-5', 'translate-x-0');
+                showToast('Auto-start disabled');
+            }
+        }
+
+        // --- Core Logic ---
+        function addFiles(newFiles) {
+            const fileObjs = newFiles.map(file => ({
+                id: Math.random().toString(36).substr(2, 9),
+                originalFile: file,
+                originalSize: file.size,
+                originalDims: null,
+                compressedBlob: null,
+                compressedSize: 0,
+                compressedDims: null,
+                previewUrl: URL.createObjectURL(file),
+                status: 'pending',
+                name: file.name
+            }));
+            
+            files = [...files, ...fileObjs];
+            renderFiles();
+            
+            // Get dimensions
+            files.forEach(getOriginalDimensions);
+
+            if (settings.autoStart) {
+                runOptimizer();
+            }
+        }
+
+        function getOriginalDimensions(fileObj) {
+            if (fileObj.originalDims) return;
+            const img = new Image();
+            img.onload = () => {
+                fileObj.originalDims = { width: img.width, height: img.height };
+                renderFiles(); 
+            };
+            img.src = fileObj.previewUrl;
+        }
+
+        function updateSetting(key, value) {
+            settings[key] = value;
+            
+            if (key === 'quality') qualityDisplay.textContent = Math.round(value * 100) + '%';
+            if (key === 'format') {
+                document.querySelectorAll('.format-btn').forEach(btn => {
+                    // Reset styling
+                    btn.classList.remove('active', 'bg-indigo-600', 'text-white', 'shadow-md', 'shadow-indigo-200', 'dark:shadow-none');
+                    btn.classList.add('bg-slate-100', 'dark:bg-slate-700', 'text-slate-600', 'dark:text-slate-300');
+                    
+                    if(btn.dataset.value === value) {
+                        btn.classList.remove('bg-slate-100', 'dark:bg-slate-700', 'text-slate-600', 'dark:text-slate-300');
+                        btn.classList.add('active', 'bg-indigo-600', 'text-white', 'shadow-md', 'shadow-indigo-200', 'dark:shadow-none');
+                    }
+                });
+            }
+
+            // If settings change, allow re-run
+            if (files.length > 0) {
+                files = files.map(f => ({ ...f, status: f.status === 'done' ? 'pending' : f.status }));
+                renderFiles();
+            }
+        }
+
+        function removeFile(id) {
+            files = files.filter(f => f.id !== id);
+            renderFiles();
+        }
+
+        function clearAll() {
+            files = [];
+            renderFiles();
+            showToast('All files cleared');
+        }
+
+        // --- Processing ---
+        async function processImage(fileObj) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.src = fileObj.previewUrl;
+                
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > settings.maxWidth) {
+                        const ratio = settings.maxWidth / width;
+                        width = settings.maxWidth;
+                        height = height * ratio;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob((blob) => {
+                        if (!blob) { reject(new Error('Compression failed')); return; }
+                        resolve({
+                            blob,
+                            size: blob.size,
+                            dims: { width, height }
+                        });
+                    }, settings.format, settings.quality);
+                };
+                img.onerror = (err) => reject(err);
+            });
+        }
+
+        async function runOptimizer() {
+            const filesToProcess = files.filter(f => f.status !== 'done');
+            if (filesToProcess.length === 0) return;
+
+            files = files.map(f => f.status === 'pending' ? { ...f, status: 'processing' } : f);
+            renderFiles();
+            showToast(`Starting optimization of ${filesToProcess.length} files...`);
+
+            let processedCount = 0;
+            const totalToProcess = filesToProcess.length;
+
+            for (let i = 0; i < files.length; i++) {
+                if (files[i].status === 'processing') {
+                    try {
+                        // Small delay to allow UI to breathe/update
+                        await new Promise(r => setTimeout(r, 20));
+                        
+                        const result = await processImage(files[i]);
+                        files[i].status = 'done';
+                        files[i].compressedBlob = result.blob;
+                        files[i].compressedSize = result.size;
+                        files[i].compressedDims = result.dims;
+                    } catch (error) {
+                        console.error(error);
+                        files[i].status = 'error';
+                    }
+                    
+                    processedCount++;
+                    // Update Global Progress
+                    const progress = (processedCount / totalToProcess) * 100;
+                    globalProgress.style.width = `${progress}%`;
+                    
+                    renderFiles();
+                }
+            }
+
+            setTimeout(() => {
+                globalProgress.style.width = '0%';
+                showToast('Optimization complete!');
+            }, 500);
+        }
+
+        // --- Downloading ---
+        function getDownloadExt() {
+            if (settings.format === 'image/webp') return 'webp';
+            if (settings.format === 'image/png') return 'png';
+            if (settings.format === 'image/avif') return 'avif';
+            return 'jpg';
+        }
+
+        function getNewFilename(originalName) {
+            const oldName = originalName.replace(/\.[^/.]+$/, "");
+            return `${oldName}${settings.suffix}.${getDownloadExt()}`;
+        }
+
+        function downloadFile(id) {
+            const file = files.find(f => f.id === id);
+            if (!file || !file.compressedBlob) return;
+
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(file.compressedBlob);
+            link.download = getNewFilename(file.name);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast('Download started');
+        }
+
+        async function downloadZip() {
+            const zip = new JSZip();
+            const folder = zip.folder("optimized_images");
+            let count = 0;
+
+            files.forEach(f => {
+                if (f.status === 'done' && f.compressedBlob) {
+                    folder.file(getNewFilename(f.name), f.compressedBlob);
+                    count++;
+                }
+            });
+
+            if (count === 0) {
+                showToast("No optimized images to download.", 'error');
+                return;
+            }
+
+            showToast("Generating ZIP file...");
+            const content = await zip.generateAsync({ type: "blob" });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = "optimized_images.zip";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("ZIP download started");
+        }
+
+        // --- Comparison Modal Logic ---
+        let isDraggingSlider = false;
+
+        function openComparison(id) {
+            const file = files.find(f => f.id === id);
+            if (!file || !file.compressedBlob) return;
+
+            compOrigSize.textContent = formatBytes(file.originalSize);
+            compOptSize.textContent = formatBytes(file.compressedSize);
+            compDownloadBtn.onclick = () => downloadFile(id);
+
+            const compressedUrl = URL.createObjectURL(file.compressedBlob);
+
+            compImgContainer.innerHTML = `
+                <div class="comparison-container relative" style="display:inline-block;">
+                    <img src="${file.previewUrl}" class="block max-h-[60vh] max-w-full object-contain" style="opacity: 1;">
+                    <div id="modified-image-wrapper" style="position:absolute; top:0; left:0; height:100%; width:50%; overflow:hidden; border-right: 2px solid white; box-shadow: 5px 0 15px rgba(0,0,0,0.3);">
+                        <img src="${compressedUrl}" style="height:100%; max-width:none; width: auto;" id="modified-image-element">
+                    </div>
+                    <div id="slider-handle" class="comparison-handle" style="left: 50%;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:-12px"><path d="m15 18-6-6 6-6"/></svg>
+                    </div>
+                </div>
+            `;
+
+            const origImg = compImgContainer.querySelector('img');
+            const modImg = document.getElementById('modified-image-element');
+            
+            setTimeout(() => {
+                if(origImg.offsetWidth > 0) modImg.style.width = origImg.offsetWidth + 'px';
+            }, 100);
+
+            compareModal.classList.remove('hidden');
+            void compareModal.offsetWidth;
+            compareModal.classList.remove('opacity-0');
+            compareContent.classList.remove('scale-95');
+
+            const container = compImgContainer.querySelector('.comparison-container');
+            const wrapper = document.getElementById('modified-image-wrapper');
+            const handle = document.getElementById('slider-handle');
+
+            const updateSlider = (clientX) => {
+                const rect = container.getBoundingClientRect();
+                let x = clientX - rect.left;
+                if (x < 0) x = 0;
+                if (x > rect.width) x = rect.width;
+                
+                const percent = (x / rect.width) * 100;
+                wrapper.style.width = percent + '%';
+                handle.style.left = percent + '%';
+            };
+
+            const onMove = (e) => {
+                if (!isDraggingSlider) return;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                updateSlider(clientX);
+            };
+
+            const onStart = (e) => {
+                isDraggingSlider = true;
+                e.preventDefault();
+            };
+
+            const onEnd = () => { isDraggingSlider = false; };
+
+            container.addEventListener('mousedown', onStart);
+            container.addEventListener('touchstart', onStart);
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('touchmove', onMove);
+            window.addEventListener('mouseup', onEnd);
+            window.addEventListener('touchend', onEnd);
+
+            compareModal.cleanup = () => {
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('touchmove', onMove);
+                window.removeEventListener('mouseup', onEnd);
+                window.removeEventListener('touchend', onEnd);
+            };
+        }
+
+        function closeComparison() {
+            compareModal.classList.add('opacity-0');
+            compareContent.classList.add('scale-95');
+            setTimeout(() => {
+                compareModal.classList.add('hidden');
+                if (compareModal.cleanup) compareModal.cleanup();
+                compImgContainer.innerHTML = '';
+            }, 300);
+        }
+
+        // --- Utils & Rendering ---
+        function formatBytes(bytes, decimals = 2) {
+            if (!bytes) return '0 B';
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        function updateStats() {
+            const doneFiles = files.filter(f => f.status === 'done');
+            
+            statCount.textContent = files.length;
+            const totalOrig = files.reduce((acc, f) => acc + f.originalSize, 0);
+            const totalOpt = files.reduce((acc, f) => acc + (f.status === 'done' ? f.compressedSize : f.originalSize), 0);
+            
+            const saved = totalOrig - totalOpt;
+            
+            statOrig.textContent = (totalOrig / (1024 * 1024)).toFixed(2);
+            statSaved.textContent = (Math.max(0, saved) / (1024 * 1024)).toFixed(2);
+
+            if (totalOrig > 0 && saved > 0) {
+                const p = Math.round((saved / totalOrig) * 100);
+                statPercent.textContent = p + '%';
+            } else {
+                statPercent.textContent = '0%';
+            }
+        }
+
+        function renderFiles() {
+            updateStats();
+
+            if (files.length === 0) {
+                emptyState.classList.remove('hidden');
+                actionBar.classList.add('hidden');
+                fileList.innerHTML = '';
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            actionBar.classList.remove('hidden');
+            actionBar.classList.add('flex');
+
+            fileList.innerHTML = files.map(file => {
+                const isDone = file.status === 'done';
+                const isProcessing = file.status === 'processing';
+                const percentSaved = isDone && file.compressedSize < file.originalSize 
+                    ? Math.round(((file.originalSize - file.compressedSize) / file.originalSize) * 100) 
+                    : 0;
+
+                let dimsText = '';
+                if (file.originalDims) {
+                    dimsText = `${file.originalDims.width}x${file.originalDims.height}`;
+                    if (isDone && file.compressedDims) {
+                        if (file.compressedDims.width !== file.originalDims.width) {
+                            dimsText += ` <i data-lucide="arrow-right" class="w-3 h-3 inline"></i> ${file.compressedDims.width}x${file.compressedDims.height}`;
+                        }
+                    }
+                }
+
+                return `
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all flex flex-col sm:flex-row items-center gap-4 group animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    
+                    <div class="w-full sm:w-20 h-20 bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden flex-shrink-0 border border-slate-100 dark:border-slate-600 relative">
+                        <img src="${file.previewUrl}" class="w-full h-full object-cover">
+                        ${isProcessing ? `
+                            <div class="absolute inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm flex items-center justify-center">
+                                <div class="loader"></div>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="flex-1 min-w-0 w-full text-center sm:text-left">
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
+                            <h4 class="font-bold text-slate-800 dark:text-slate-200 truncate text-sm" title="${file.name}">${file.name}</h4>
+                            ${isDone ? `<span class="inline-flex mx-auto sm:mx-0 items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 uppercase tracking-wide">Saved ${percentSaved}%</span>` : ''}
+                            ${file.status === 'error' ? `<span class="text-xs text-red-500 font-bold">Error</span>` : ''}
+                        </div>
+                        
+                        <div class="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-xs text-slate-500 dark:text-slate-400">
+                            <span class="font-mono bg-slate-50 dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-100 dark:border-slate-600">${formatBytes(file.originalSize)}</span>
+                            ${isDone ? `
+                                <i data-lucide="arrow-right" class="w-3 h-3 hidden sm:block text-slate-300 dark:text-slate-500"></i>
+                                <span class="font-mono bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-800 font-bold">${formatBytes(file.compressedSize)}</span>
+                            ` : ''}
+                            ${dimsText ? `<span class="text-slate-400 dark:text-slate-500 pl-2 border-l border-slate-200 dark:border-slate-700 hidden sm:inline-block">${dimsText}</span>` : ''}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 w-full sm:w-auto justify-center">
+                        ${isDone ? `
+                            <button onclick="openComparison('${file.id}')" class="p-2.5 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl transition-colors border border-slate-100 dark:border-slate-600 group-hover:border-slate-300 dark:group-hover:border-slate-500" title="Compare">
+                                <i data-lucide="eye" class="w-5 h-5"></i>
+                            </button>
+                            <button onclick="downloadFile('${file.id}')" class="p-2.5 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-xl transition-colors border border-indigo-100 dark:border-indigo-800 group-hover:border-indigo-200 dark:group-hover:border-indigo-700" title="Download">
+                                <i data-lucide="download" class="w-5 h-5"></i>
+                            </button>
+                        ` : ''}
+                        <button onclick="removeFile('${file.id}')" class="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors" title="Remove">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        renderFiles();
+    </script>
+</body>
+</html>
