@@ -2,7 +2,7 @@
 <html lang="en" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SpaceSaver Pro - Advanced Image Optimizer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -12,6 +12,9 @@
                 extend: {
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
+                    },
+                    screens: {
+                        'xs': '475px',
                     }
                 }
             }
@@ -25,7 +28,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         
         /* Custom scrollbar */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .dark ::-webkit-scrollbar-thumb { background: #475569; }
@@ -38,11 +41,27 @@
         }
 
         /* Comparison Slider Styles */
+        .comparison-wrapper-scroll {
+            overflow: auto;
+            touch-action: pan-x pan-y;
+            -webkit-overflow-scrolling: touch;
+        }
+
         .comparison-container {
             position: relative;
             overflow: hidden;
             user-select: none;
+            /* Default to fit */
+            max-width: 100%;
+            margin: 0 auto;
         }
+
+        .comparison-container.zoomed {
+            max-width: none !important;
+            width: auto;
+            cursor: grab;
+        }
+        
         .comparison-slider {
             position: absolute;
             top: 0;
@@ -52,14 +71,16 @@
             z-index: 10;
             cursor: ew-resize;
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            pointer-events: none; /* Let clicks pass through if needed, but handled via JS */
         }
+
         .comparison-handle {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 40px;
-            height: 40px;
+            width: 44px; /* Larger touch target */
+            height: 44px;
             background: white;
             border-radius: 50%;
             display: flex;
@@ -68,8 +89,11 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             color: #4f46e5;
             transition: transform 0.1s;
+            cursor: grab;
+            z-index: 20;
+            touch-action: none; /* Prevent scrolling when dragging handle */
         }
-        .comparison-handle:active { transform: translate(-50%, -50%) scale(1.1); }
+        .comparison-handle:active { transform: translate(-50%, -50%) scale(1.1); cursor: grabbing; }
         
         .loader {
             border: 3px solid rgba(255,255,255,0.3);
@@ -93,6 +117,11 @@
             from { transform: translateY(100%); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
+
+        /* Prevent body scroll when modal open */
+        body.modal-open {
+            overflow: hidden;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300 pb-20">
@@ -105,22 +134,25 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center gap-3">
-                    <div class="bg-gradient-to-br from-indigo-500 to-purple-600 p-2.5 rounded-xl text-white shadow-lg shadow-indigo-200 dark:shadow-none">
+                    <div class="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-200 dark:shadow-none">
                         <i data-lucide="zap" class="w-5 h-5"></i>
                     </div>
                     <div>
-                        <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 leading-none">SpaceSaver Pro</h1>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">Bulk Image Optimizer</p>
+                        <h1 class="text-lg sm:text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 leading-none">SpaceSaver Pro</h1>
+                        <p class="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">Bulk Image Optimizer</p>
                     </div>
                 </div>
                 
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 sm:gap-4">
                     <button id="theme-toggle" class="p-2 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
                         <i data-lucide="moon" class="w-5 h-5 hidden dark:block"></i>
                         <i data-lucide="sun" class="w-5 h-5 block dark:hidden"></i>
                     </button>
-                    <div class="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
-                    <button onclick="window.location.reload()" class="text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors text-sm font-medium">Reset</button>
+                    <div class="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+                    <button onclick="window.location.reload()" class="hidden sm:block text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors text-sm font-medium">Reset</button>
+                    <button onclick="window.location.reload()" class="sm:hidden p-2 text-slate-500 hover:text-indigo-600 dark:text-slate-400 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                         <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
+                    </button>
                 </div>
             </div>
         </div>
@@ -128,44 +160,44 @@
 
     <!-- Stats Dashboard -->
     <div class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 transition-colors duration-300">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-8">
                 <!-- Stat Cards -->
-                <div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 transition-colors">
-                    <p class="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">Total Files</p>
+                <div class="bg-slate-50 dark:bg-slate-800 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-100 dark:border-slate-700 transition-colors">
+                    <p class="text-slate-500 dark:text-slate-400 text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-1">Total Files</p>
                     <div class="flex items-baseline gap-2">
-                        <span id="stat-count" class="text-2xl font-bold text-slate-900 dark:text-white">0</span>
-                        <span class="text-xs text-slate-400 font-medium">images</span>
+                        <span id="stat-count" class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">0</span>
+                        <span class="text-[10px] sm:text-xs text-slate-400 font-medium">images</span>
                     </div>
                 </div>
-                <div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 transition-colors">
-                    <p class="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">Original Size</p>
+                <div class="bg-slate-50 dark:bg-slate-800 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-100 dark:border-slate-700 transition-colors">
+                    <p class="text-slate-500 dark:text-slate-400 text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-1">Original Size</p>
                     <div class="flex items-baseline gap-2">
-                        <span id="stat-orig" class="text-2xl font-bold text-slate-900 dark:text-white">0</span>
-                        <span class="text-xs text-slate-400 font-medium">MB</span>
+                        <span id="stat-orig" class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">0</span>
+                        <span class="text-[10px] sm:text-xs text-slate-400 font-medium">MB</span>
                     </div>
                 </div>
-                <div class="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-800 transition-colors">
-                    <p class="text-indigo-600 dark:text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-1">Space Saved</p>
+                <div class="bg-indigo-50 dark:bg-indigo-900/20 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-indigo-100 dark:border-indigo-800 transition-colors">
+                    <p class="text-indigo-600 dark:text-indigo-400 text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-1">Space Saved</p>
                     <div class="flex items-baseline gap-2">
-                        <span id="stat-saved" class="text-2xl font-bold text-indigo-700 dark:text-indigo-300">0</span>
-                        <span class="text-xs text-indigo-500 dark:text-indigo-400 font-medium">MB</span>
+                        <span id="stat-saved" class="text-xl sm:text-2xl font-bold text-indigo-700 dark:text-indigo-300">0</span>
+                        <span class="text-[10px] sm:text-xs text-indigo-500 dark:text-indigo-400 font-medium">MB</span>
                     </div>
                 </div>
-                <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-2xl border border-green-100 dark:border-green-800 transition-colors">
-                    <p class="text-green-600 dark:text-green-400 text-xs font-semibold uppercase tracking-wider mb-1">Efficiency</p>
+                <div class="bg-green-50 dark:bg-green-900/20 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-green-100 dark:border-green-800 transition-colors">
+                    <p class="text-green-600 dark:text-green-400 text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-1">Efficiency</p>
                     <div class="flex items-baseline gap-2">
-                        <span id="stat-percent" class="text-2xl font-bold text-green-700 dark:text-green-300">0%</span>
-                        <span class="text-xs text-green-600 dark:text-green-400 font-medium">reduction</span>
+                        <span id="stat-percent" class="text-xl sm:text-2xl font-bold text-green-700 dark:text-green-300">0%</span>
+                        <span class="text-[10px] sm:text-xs text-green-600 dark:text-green-400 font-medium">reduction</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
             
             <!-- Sidebar / Settings -->
             <div class="lg:col-span-4 space-y-6">
@@ -173,7 +205,7 @@
                 <!-- Upload Box -->
                 <div 
                     id="drop-zone"
-                    class="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl bg-white dark:bg-slate-800 p-8 text-center transition-all cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-500 hover:shadow-xl hover:shadow-indigo-50 dark:hover:shadow-none group relative overflow-hidden"
+                    class="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl bg-white dark:bg-slate-800 p-6 sm:p-8 text-center transition-all cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-500 hover:shadow-xl hover:shadow-indigo-50 dark:hover:shadow-none group relative overflow-hidden"
                     onclick="document.getElementById('file-input').click()"
                     ondragover="handleDragOver(event)"
                     ondragleave="handleDragLeave(event)"
@@ -183,16 +215,16 @@
                     <div class="relative z-10">
                         <input type="file" id="file-input" class="hidden" multiple accept="image/*" onchange="handleFileSelect(event)">
                         
-                        <div class="w-16 h-16 bg-white dark:bg-slate-700 shadow-sm border border-slate-100 dark:border-slate-600 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
-                            <i data-lucide="upload-cloud" class="w-8 h-8"></i>
+                        <div class="w-12 h-12 sm:w-16 sm:h-16 bg-white dark:bg-slate-700 shadow-sm border border-slate-100 dark:border-slate-600 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
+                            <i data-lucide="upload-cloud" class="w-6 h-6 sm:w-8 sm:h-8"></i>
                         </div>
-                        <h3 class="text-lg font-bold text-slate-900 dark:text-white">Add Images</h3>
-                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-2 px-4">Drag & drop or click to browse. <br/> Supports JPG, PNG, WebP.</p>
+                        <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Add Images</h3>
+                        <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2">Tap to browse or drag files here. <br/> Supports JPG, PNG, WebP.</p>
                     </div>
                 </div>
 
                 <!-- Settings Card -->
-                <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
+                <div class="bg-white dark:bg-slate-800 p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
                     <div class="flex items-center gap-2 mb-6">
                         <div class="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
                             <i data-lucide="sliders" class="w-4 h-4 text-slate-600 dark:text-slate-300"></i>
@@ -200,7 +232,7 @@
                         <h2 class="font-bold text-slate-800 dark:text-white">Configuration</h2>
                     </div>
 
-                    <div class="space-y-6">
+                    <div class="space-y-5 sm:space-y-6">
                         <!-- Auto Start Toggle -->
                         <div class="flex items-center justify-between">
                             <label class="text-sm font-medium text-slate-700 dark:text-slate-300">Auto-start on upload</label>
@@ -211,7 +243,7 @@
 
                         <!-- Format -->
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Target Format</label>
+                            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 sm:mb-3">Target Format</label>
                             <div class="grid grid-cols-2 gap-2 mb-2">
                                 <button onclick="updateSetting('format', 'image/avif')" class="format-btn bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition-all" data-value="image/avif">
                                     AVIF (Best)
@@ -232,7 +264,7 @@
 
                         <!-- Quality -->
                         <div>
-                            <div class="flex justify-between mb-3">
+                            <div class="flex justify-between mb-2 sm:mb-3">
                                 <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Quality Level</label>
                                 <span id="quality-display" class="text-xs font-bold bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded">80%</span>
                             </div>
@@ -248,7 +280,7 @@
 
                         <!-- Resize -->
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Max Width</label>
+                            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 sm:mb-3">Max Width</label>
                             <div class="relative">
                                 <select onchange="updateSetting('maxWidth', parseInt(this.value))" class="w-full p-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none appearance-none transition-colors">
                                     <option value="3840">Original / 4K (3840px)</option>
@@ -262,7 +294,7 @@
 
                         <!-- Filename Options -->
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Filename Suffix</label>
+                            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 sm:mb-3">Filename Suffix</label>
                             <input type="text" id="suffix-input" value="_optimized" onchange="updateSetting('suffix', this.value)" class="w-full p-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition-colors" placeholder="_optimized">
                         </div>
 
@@ -298,12 +330,12 @@
                 </div>
 
                 <!-- Empty State -->
-                <div id="empty-state" class="flex flex-col items-center justify-center py-20 text-slate-400 dark:text-slate-500">
+                <div id="empty-state" class="flex flex-col items-center justify-center py-10 sm:py-20 text-slate-400 dark:text-slate-500">
                     <div class="bg-slate-100 dark:bg-slate-800 p-6 rounded-full mb-4 transition-colors">
                         <i data-lucide="image" class="w-10 h-10 opacity-50"></i>
                     </div>
                     <p class="text-lg font-medium text-slate-600 dark:text-slate-300">No images loaded yet</p>
-                    <p class="text-sm">Upload images to start saving space</p>
+                    <p class="text-sm text-center px-4">Upload images to start saving space</p>
                 </div>
 
                 <!-- File List -->
@@ -316,42 +348,54 @@
 
     <!-- Comparison Modal -->
     <div id="compare-modal" class="fixed inset-0 z-50 hidden opacity-0 transition-opacity duration-300">
-        <div class="absolute inset-0 bg-slate-900/90 backdrop-blur-sm" onclick="closeComparison()"></div>
-        <div class="absolute inset-0 flex items-center justify-center p-4">
-            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden transform scale-95 transition-all duration-300" id="compare-content">
+        <div class="absolute inset-0 bg-slate-900/95 backdrop-blur-md" onclick="closeComparison()"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-0 sm:p-4">
+            <div class="bg-white dark:bg-slate-800 sm:rounded-2xl shadow-2xl w-full h-[100dvh] sm:h-auto sm:max-w-5xl sm:max-h-[90vh] flex flex-col overflow-hidden transform sm:scale-95 transition-all duration-300" id="compare-content">
                 
                 <!-- Modal Header -->
-                <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 z-20 transition-colors">
-                    <div>
-                        <h3 class="font-bold text-slate-800 dark:text-white">Visual Comparison</h3>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Drag slider to compare Original vs Optimized</p>
+                <div class="p-3 sm:p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 z-20 transition-colors shrink-0">
+                    <div class="flex items-center gap-3">
+                        <div>
+                            <h3 class="font-bold text-slate-800 dark:text-white text-sm sm:text-base">Visual Comparison</h3>
+                            <p class="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 hidden xs:block">Drag slider to compare • Pan when zoomed</p>
+                        </div>
                     </div>
-                    <button onclick="closeComparison()" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-500 transition-colors">
-                        <i data-lucide="x" class="w-5 h-5"></i>
-                    </button>
+                    
+                    <div class="flex items-center gap-2">
+                         <div class="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5 mr-2">
+                            <button id="zoom-fit-btn" onclick="setZoom(false)" class="px-3 py-1.5 rounded-md text-xs font-medium bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-300 shadow-sm transition-all">Fit</button>
+                            <button id="zoom-1-btn" onclick="setZoom(true)" class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-all">1:1</button>
+                        </div>
+
+                        <button onclick="closeComparison()" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-500 transition-colors">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Canvas Area -->
-                <div class="flex-1 relative bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwgAADsIBFShKgAAAABh0RVh0U29mdHdhcmUAcGFpbnQubmV0IDQuMC440b43JAAAABxJREFUOE9jTK2895+BgYEh9fJ7MAYGBgYGBgYAkC4P0d7lQ84AAAAASUVORK5CYII=')] bg-repeat overflow-hidden flex items-center justify-center p-4" id="comparison-wrapper">
-                    <div class="relative max-w-full max-h-full shadow-2xl" id="comp-img-container">
+                <div class="flex-1 relative bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwgAADsIBFShKgAAAABh0RVh0U29mdHdhcmUAcGFpbnQubmV0IDQuMC440b43JAAAABxJREFUOE9jTK2895+BgYEh9fJ7MAYGBgYGBgYAkC4P0d7lQ84AAAAASUVORK5CYII=')] bg-repeat comparison-wrapper-scroll flex items-center justify-center" id="comparison-wrapper">
+                    <!-- Image container -->
+                    <div class="comparison-container shadow-2xl transition-all duration-200" id="comp-img-container">
                         <!-- Images injected here -->
                     </div>
                 </div>
 
                 <!-- Modal Footer -->
-                <div class="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center transition-colors">
-                    <div class="flex gap-8">
-                        <div>
-                            <p class="text-xs font-bold text-slate-400 uppercase">Original</p>
+                <div class="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex flex-col xs:flex-row justify-between items-center gap-4 transition-colors shrink-0">
+                    <div class="flex gap-6 sm:gap-8 w-full xs:w-auto justify-center xs:justify-start">
+                        <div class="text-center xs:text-left">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase">Original</p>
                             <p class="text-sm font-semibold text-slate-700 dark:text-slate-200" id="comp-orig-size">-</p>
                         </div>
-                        <div>
-                            <p class="text-xs font-bold text-indigo-400 uppercase">Optimized</p>
+                        <div class="text-center xs:text-left">
+                            <p class="text-[10px] font-bold text-indigo-400 uppercase">Optimized</p>
                             <p class="text-sm font-semibold text-indigo-700 dark:text-indigo-300" id="comp-opt-size">-</p>
                         </div>
                     </div>
-                    <button id="comp-download-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none">
-                        Download This Image
+                    <button id="comp-download-btn" class="w-full xs:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none flex justify-center items-center gap-2">
+                         <i data-lucide="download" class="w-4 h-4"></i>
+                        Download
                     </button>
                 </div>
             </div>
@@ -359,7 +403,7 @@
     </div>
 
     <!-- Toast Container -->
-    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"></div>
+    <div id="toast-container" class="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none w-full max-w-sm px-4 sm:px-0"></div>
 
     <script>
         // --- State ---
@@ -372,6 +416,7 @@
             autoStart: false
         };
         let darkMode = localStorage.getItem('theme') === 'dark';
+        let isZoomed = false;
 
         // --- Init ---
         lucide.createIcons();
@@ -398,6 +443,8 @@
         const compOrigSize = document.getElementById('comp-orig-size');
         const compOptSize = document.getElementById('comp-opt-size');
         const compDownloadBtn = document.getElementById('comp-download-btn');
+        const zoomFitBtn = document.getElementById('zoom-fit-btn');
+        const zoom1Btn = document.getElementById('zoom-1-btn');
 
         // --- Theme Logic ---
         document.getElementById('theme-toggle').addEventListener('click', () => {
@@ -423,7 +470,7 @@
                 ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/50 dark:text-red-200 dark:border-red-800'
                 : 'bg-white text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700';
 
-            toast.className = `toast pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg ${colors} min-w-[200px]`;
+            toast.className = `toast pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg ${colors} w-full sm:w-auto self-end`;
             toast.innerHTML = `
                 <i data-lucide="${type === 'error' ? 'alert-circle' : 'check-circle-2'}" class="w-5 h-5 ${type === 'error' ? 'text-red-500' : 'text-green-500'}"></i>
                 <span class="text-sm font-medium">${message}</span>
@@ -678,9 +725,28 @@
         // --- Comparison Modal Logic ---
         let isDraggingSlider = false;
 
+        function setZoom(enable) {
+            isZoomed = enable;
+            const container = document.getElementById('comp-img-container');
+            
+            if (isZoomed) {
+                container.classList.add('zoomed');
+                zoom1Btn.className = "px-3 py-1.5 rounded-md text-xs font-medium bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-300 shadow-sm transition-all";
+                zoomFitBtn.className = "px-3 py-1.5 rounded-md text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-all";
+                showToast('Zoomed 1:1. Pan to inspect details.');
+            } else {
+                container.classList.remove('zoomed');
+                zoomFitBtn.className = "px-3 py-1.5 rounded-md text-xs font-medium bg-white dark:bg-slate-600 text-indigo-600 dark:text-indigo-300 shadow-sm transition-all";
+                zoom1Btn.className = "px-3 py-1.5 rounded-md text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-all";
+            }
+        }
+
         function openComparison(id) {
             const file = files.find(f => f.id === id);
             if (!file || !file.compressedBlob) return;
+
+            // Reset Zoom
+            setZoom(false);
 
             compOrigSize.textContent = formatBytes(file.originalSize);
             compOptSize.textContent = formatBytes(file.compressedSize);
@@ -688,9 +754,10 @@
 
             const compressedUrl = URL.createObjectURL(file.compressedBlob);
 
+            // Important: We render image with natural dimensions but constrain with CSS
             compImgContainer.innerHTML = `
-                <div class="comparison-container relative" style="display:inline-block;">
-                    <img src="${file.previewUrl}" class="block max-h-[60vh] max-w-full object-contain" style="opacity: 1;">
+                <div class="comparison-container relative inline-block">
+                    <img src="${file.previewUrl}" class="block max-w-none" style="opacity: 1; height: auto;" id="comp-orig-img">
                     <div id="modified-image-wrapper" style="position:absolute; top:0; left:0; height:100%; width:50%; overflow:hidden; border-right: 2px solid white; box-shadow: 5px 0 15px rgba(0,0,0,0.3);">
                         <img src="${compressedUrl}" style="height:100%; max-width:none; width: auto;" id="modified-image-element">
                     </div>
@@ -701,18 +768,29 @@
                 </div>
             `;
 
-            const origImg = compImgContainer.querySelector('img');
+            const origImg = document.getElementById('comp-orig-img');
             const modImg = document.getElementById('modified-image-element');
             
-            setTimeout(() => {
-                if(origImg.offsetWidth > 0) modImg.style.width = origImg.offsetWidth + 'px';
-            }, 100);
+            // Sync widths for comparison overlay
+            const syncWidths = () => {
+                if(origImg.offsetWidth > 0) {
+                    modImg.style.width = origImg.offsetWidth + 'px';
+                }
+            };
 
+            // Image load handling
+            origImg.onload = syncWidths;
+            // Also retry after short delay in case of cache render
+            setTimeout(syncWidths, 50);
+
+            // Show Modal
+            document.body.classList.add('modal-open');
             compareModal.classList.remove('hidden');
-            void compareModal.offsetWidth;
+            void compareModal.offsetWidth; // Trigger reflow
             compareModal.classList.remove('opacity-0');
-            compareContent.classList.remove('scale-95');
+            compareContent.classList.remove('sm:scale-95');
 
+            // --- Slider Events ---
             const container = compImgContainer.querySelector('.comparison-container');
             const wrapper = document.getElementById('modified-image-wrapper');
             const handle = document.getElementById('slider-handle');
@@ -720,6 +798,8 @@
             const updateSlider = (clientX) => {
                 const rect = container.getBoundingClientRect();
                 let x = clientX - rect.left;
+                
+                // Bounds
                 if (x < 0) x = 0;
                 if (x > rect.width) x = rect.width;
                 
@@ -732,19 +812,33 @@
                 if (!isDraggingSlider) return;
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 updateSlider(clientX);
+                // Prevent scrolling while dragging slider on mobile
+                if(e.touches) e.preventDefault(); 
             };
 
             const onStart = (e) => {
+                // If zoomed, only allow dragging via the handle to permit scrolling elsewhere
+                if (isZoomed && e.target !== handle && !handle.contains(e.target)) {
+                    return; 
+                }
+                
                 isDraggingSlider = true;
-                e.preventDefault();
+                // If touching handle, prevent default scroll
+                if(e.type === 'touchstart') {
+                    // Don't prevent default here instantly or clicks might fail, 
+                    // but we handle move prevention in onMove
+                }
             };
 
             const onEnd = () => { isDraggingSlider = false; };
 
+            // Attach to handle specifically for better touch control + container for mouse clicks
             container.addEventListener('mousedown', onStart);
-            container.addEventListener('touchstart', onStart);
-            window.addEventListener('mousemove', onMove);
-            window.addEventListener('touchmove', onMove);
+            container.addEventListener('touchstart', onStart, { passive: false });
+            
+            window.addEventListener('mousemove', onMove, { passive: false });
+            window.addEventListener('touchmove', onMove, { passive: false });
+            
             window.addEventListener('mouseup', onEnd);
             window.addEventListener('touchend', onEnd);
 
@@ -757,8 +851,9 @@
         }
 
         function closeComparison() {
+            document.body.classList.remove('modal-open');
             compareModal.classList.add('opacity-0');
-            compareContent.classList.add('scale-95');
+            compareContent.classList.add('sm:scale-95');
             setTimeout(() => {
                 compareModal.classList.add('hidden');
                 if (compareModal.cleanup) compareModal.cleanup();
@@ -829,9 +924,9 @@
                 }
 
                 return `
-                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all flex flex-col sm:flex-row items-center gap-4 group animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all flex flex-col sm:flex-row items-center gap-4 group animate-in fade-in slide-in-from-bottom-2 duration-300">
                     
-                    <div class="w-full sm:w-20 h-20 bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden flex-shrink-0 border border-slate-100 dark:border-slate-600 relative">
+                    <div class="w-full sm:w-20 h-32 sm:h-20 bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden flex-shrink-0 border border-slate-100 dark:border-slate-600 relative">
                         <img src="${file.previewUrl}" class="w-full h-full object-cover">
                         ${isProcessing ? `
                             <div class="absolute inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm flex items-center justify-center">
@@ -847,23 +942,26 @@
                             ${file.status === 'error' ? `<span class="text-xs text-red-500 font-bold">Error</span>` : ''}
                         </div>
                         
-                        <div class="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-xs text-slate-500 dark:text-slate-400">
+                        <div class="flex flex-col sm:flex-row items-center gap-1 sm:gap-4 text-xs text-slate-500 dark:text-slate-400">
                             <span class="font-mono bg-slate-50 dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-100 dark:border-slate-600">${formatBytes(file.originalSize)}</span>
                             ${isDone ? `
                                 <i data-lucide="arrow-right" class="w-3 h-3 hidden sm:block text-slate-300 dark:text-slate-500"></i>
+                                <span class="block sm:hidden text-[10px] text-slate-400">to</span>
                                 <span class="font-mono bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-800 font-bold">${formatBytes(file.compressedSize)}</span>
                             ` : ''}
-                            ${dimsText ? `<span class="text-slate-400 dark:text-slate-500 pl-2 border-l border-slate-200 dark:border-slate-700 hidden sm:inline-block">${dimsText}</span>` : ''}
+                            ${dimsText ? `<span class="text-slate-400 dark:text-slate-500 sm:pl-2 sm:border-l border-slate-200 dark:border-slate-700 inline-block mt-1 sm:mt-0">${dimsText}</span>` : ''}
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-2 w-full sm:w-auto justify-center">
+                    <div class="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-end">
                         ${isDone ? `
-                            <button onclick="openComparison('${file.id}')" class="p-2.5 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl transition-colors border border-slate-100 dark:border-slate-600 group-hover:border-slate-300 dark:group-hover:border-slate-500" title="Compare">
+                            <button onclick="openComparison('${file.id}')" class="flex-1 sm:flex-none p-2.5 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl transition-colors border border-slate-100 dark:border-slate-600 group-hover:border-slate-300 dark:group-hover:border-slate-500 flex items-center justify-center gap-2" title="Compare">
                                 <i data-lucide="eye" class="w-5 h-5"></i>
+                                <span class="sm:hidden text-sm font-medium">Compare</span>
                             </button>
-                            <button onclick="downloadFile('${file.id}')" class="p-2.5 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-xl transition-colors border border-indigo-100 dark:border-indigo-800 group-hover:border-indigo-200 dark:group-hover:border-indigo-700" title="Download">
+                            <button onclick="downloadFile('${file.id}')" class="flex-1 sm:flex-none p-2.5 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-xl transition-colors border border-indigo-100 dark:border-indigo-800 group-hover:border-indigo-200 dark:group-hover:border-indigo-700 flex items-center justify-center gap-2" title="Download">
                                 <i data-lucide="download" class="w-5 h-5"></i>
+                                <span class="sm:hidden text-sm font-medium">Save</span>
                             </button>
                         ` : ''}
                         <button onclick="removeFile('${file.id}')" class="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors" title="Remove">
